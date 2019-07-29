@@ -1,4 +1,4 @@
-# Steemium Post Promoter Fork
+# Steemium PostPromoter Fork
 
 ## Intro
 This fork does not modify any of the original postpromoter features.
@@ -11,7 +11,7 @@ This fork expands the original postpromoter capabilities with new features, but 
   Bids and vote reversal requests can now be both encrypted or unencrypted. Upon encrypted transfers, postpromoter will always answer encrypting the memo.
   ### Reverse bids
   Bidbot owners can now set a price for a vote reversal. For instance, accountA bids for vote on one of its posts. Then accountB sends a vote reversal request for accountA post. 
-  AccountB will actually need to pay only a fraction % of the original bid amount paid by account A.
+  AccountB can pay a fraction of the original bid amount paid by account A.
   ### Auto account claiming
 Since bidbots account will usually sit on large amounts of SP, it is often convenient to expend RC (resource credits) on new accounts.
   ### Mocha test Module
@@ -65,7 +65,7 @@ Then set the following options in config.json:
     "https://gtg.steem.house:8090"
   ],
   "reversal_mode": false,
-  "reversal_price": 0.25,
+  "reversal_price": 0.10,
   "backup_mode": false,
   "disabled_mode": false,
   "detailed_logging": false,
@@ -164,7 +164,7 @@ Then set the following options in config.json:
 ```
 
 ### Blacklist
-You can add a list of blacklisted users whose bids will not be accepted and who will not receive any refund by adding their steem account name to the "blacklist" file. Set the "blacklist_location" property to point to the location of your blacklist file, or you can use a URL to point to a shared blacklist on the internet. The file should contain only one steem account name on each line and nothing else as in the following example:
+You can add a list users whose bids will not be accepted and who will not receive any refund by adding their Steem account to the "blacklist" file. Set the "blacklist_location" property to point to the location of your blacklist file, or you can use a URL to point to a shared blacklist on the internet. The file should contain only one steem account name on each line and nothing else as in the following example:
 
 ```
 blacklisted_account_1
