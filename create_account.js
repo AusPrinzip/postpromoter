@@ -2,7 +2,7 @@ const dsteem     = require('dsteem')
 const fs         = require('fs')
 const config     = JSON.parse(fs.readFileSync('./config.json'))
 const client     = new dsteem.Client('https://api.steemit.com')
-const active_key = dsteem.PrivateKey.fromString(config.active_key)
+const active_key = dsteem.PrivateKey.fromString(wallet.acc_creating_account.active)
 const steem      = require('steem');
 var utils        = require('./utils.js')
 

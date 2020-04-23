@@ -17,11 +17,11 @@ if (config.claim_account_enabled) {
 
 async function claimAccount () {
 	utils.log('claiming account')
-	const claim_op = [ "claim_account", { creator: config.account, fee: "0.000 STEEM", extensions: [] } ]
+	const claim_op = [ "claim_account", { creator: wallet.acc_claiming_account.name, fee: "0.000 STEEM", extensions: [] } ]
 	var ops = []
 	ops.push(claim_op)
 	//broadcast operation to blockchain
-	client.broadcast.sendOperations(ops, dsteem.PrivateKey.fromString(config.active_key))
+	client.broadcast.sendOperations(ops, dsteem.PrivateKey.fromString(wallet.acc_claiming_account.active))
 	.then((res) => console.log(res))
 	.catch((e) => utils.logger.error(e))
 	setTimeout(function(){claimAccount()}, config.claimAccountCountdown * HOUR)

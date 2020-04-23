@@ -18,6 +18,7 @@ var next_round        = [];
 var blacklist         = [];
 var whitelist         = [];
 var config            = null;
+var wallet            = JSON.parse(fs.readFileSync("wallet.json"));
 var first_load        = true;
 var isVoting          = false;
 var last_withdrawal   = null;
@@ -110,7 +111,7 @@ function startup() {
     {
       var del = require('./delegators');
       utils.log('Started loading delegators from account history...');
-      del.loadDelegations(client, config.account, function(d) {
+      del.loadDelegations(client, wallet.account.name, function(d) {
         delegators = d;
         var vests = delegators.reduce(function (total, v) { return total + parseFloat(v.vesting_shares); }, 0);
         utils.log('Delegators Loaded (from account history) - ' + delegators.length + ' delegators and ' + vests + ' VESTS in total!');
@@ -134,7 +135,7 @@ function startProcess() {
   loadConfig();
 
   // Load the bot account info
-  client.database.getAccounts([config.account]).then(function (result) {
+  client.database.getAccounts([wallet.account.name]).then(function (result) {
     account = result[0];
 
     if (account && !isVoting) {
@@ -268,7 +269,7 @@ function sendVote(bid, retries, callback) {
       if(callback)
         callback();
     } else {
-      client.broadcast.vote({ voter: account.name, author: bid.author, permlink: bid.permlink, weight: bid.weight }, dsteem.PrivateKey.fromString(config.posting_key)).then(function(result) {
+      client.broadcast.vote({ voter: account.name, author: bid.author, permlink: bid.permlink, weight: bid.weight }, dsteem.PrivateKey.fromString(wallet.account.posting)).then(function(result) {
         if (result) {
           utils.log(utils.format(bid.weight / 100) + '% vote cast for: @' + bid.author + '/' + bid.permlink);
 
@@ -300,7 +301,7 @@ function sendComment(bid) {
     let link_amount = bid.amount * config.reversal_price
     let currency    = bid.currency
     link_amount     = parseFloat(link_amount).toFixed(3) + currency
-    let to          = config.account
+    let to          = wallet.account.name
     let link_memo   = 'reverse%20https://steemit.com/@' + bid.author.replace(/\./g, '') + '/' + bid.permlink
     let link        = hotsigninglink
     link            = link.replace(/\{amount\}/g, link_amount).replace(/\{to\}/g, to).replace(/\{memo\}/g, link_memo)
@@ -318,7 +319,7 @@ function sendComment(bid) {
     var permlink = 're-' + bid.author.replace(/\./g, '') + '-' + bid.permlink + '-' + new Date().toISOString().replace(/-|:|\./g, '').toLowerCase();
 
     // Replace variables in the promotion content
-    content = content.replace(/\{weight\}/g, utils.format(bid.weight / 100)).replace(/\{botname\}/g, config.account).replace(/\{sender\}/g, bid.sender);
+    content = content.replace(/\{weight\}/g, utils.format(bid.weight / 100)).replace(/\{botname\}/g, wallet.account.name).replace(/\{sender\}/g, bid.sender);
 
     var comment = { 
       author: account.name, 
@@ -331,7 +332,7 @@ function sendComment(bid) {
     };
 
     // Broadcast the comment
-    client.broadcast.comment(comment, dsteem.PrivateKey.fromString(config.posting_key)).then(function (result) {
+    client.broadcast.comment(comment, dsteem.PrivateKey.fromString(wallet.account.posting)).then(function (result) {
       if (result)
         utils.log('Posted comment: ' + permlink);
     }, function(err) { logError('Error posting comment: ' + permlink); });
@@ -344,12 +345,12 @@ function sendComment(bid) {
 
 function resteem(bid) {
   var json = JSON.stringify(['reblog', {
-    account: config.account,
+    account: wallet.account.name,
     author: bid.author,
     permlink: bid.permlink
   }]);
 
-  client.broadcast.json({ id: 'follow', json: json, required_auths: [], required_posting_auths: [config.account] }, dsteem.PrivateKey.fromString(config.posting_key)).then(function(result) {
+  client.broadcast.json({ id: 'follow', json: json, required_auths: [], required_posting_auths: [wallet.account.name] }, dsteem.PrivateKey.fromString(wallet.account.posting)).then(function(result) {
     if (result)
       utils.log('Resteemed Post: @' + bid.sender + '/' + bid.permlink);
   }, function(err) {
@@ -375,11 +376,11 @@ function getTransactions(callback) {
 
   client.database.call('get_account_history', [account.name, -1, num_trans]).then(async function (result) {
 
-    var bid_history = result.filter((x) => { return (x[1].op[0] == 'transfer' && x[1].op[1].to == config.account) }).map((x) => x[1].op[1])
+    var bid_history = result.filter((x) => { return (x[1].op[0] == 'transfer' && x[1].op[1].to == wallet.account.name) }).map((x) => x[1].op[1])
     bid_history.forEach((bid) => { // decrypting all bidhistory memos might seem to be redundant, but this way we clear the ground for latter original bid transfer search
       if (bid.memo.startsWith('#') && bid.memo.split(' ').length == 1) {
         try { 
-          bid.memo = steem.memo.decode(config.memo_key, bid.memo)
+          bid.memo = steem.memo.decode(wallet.account.memo, bid.memo)
         }catch(e){
           // console.log(e)
           // console.log(bid)
@@ -428,7 +429,7 @@ function getTransactions(callback) {
           utils.log('Processing Transaction: ' + JSON.stringify(trans));
 
         // We only care about transfers to the bot
-        if (op[0] == 'transfer' && op[1].to == config.account) {
+        if (op[0] == 'transfer' && op[1].to == wallet.account.name) {
           var amount     = parseFloat(op[1].amount);
           var amount_usd = currency == 'STEEM' ? amount * steem_price : amount * sbd_price;
           var currency   = utils.getCurrency(op[1].amount);
@@ -488,7 +489,7 @@ function getTransactions(callback) {
 
             if (!vote_to_reverse && !first_load) { // second chance for reversal trying to find the bid with a deeper request
               bid_history     = await client.database.call('get_account_history', [account.name, -1, 1000])
-              bid_history     = bid_history.filter((x) => { return (x[1].op[0] == 'transfer' && x[1].op[1].to == config.account) }).map((x) => x[1].op[1])
+              bid_history     = bid_history.filter((x) => { return (x[1].op[0] == 'transfer' && x[1].op[1].to == wallet.account.name) }).map((x) => x[1].op[1])
               match           = bid_history.find((x)=> {
                 let bid_permlink = x.memo.substr(x.memo.lastIndexOf('/') + 1)
                 let bid_author   = x.memo.substring(x.memo.lastIndexOf('@') + 1, x.memo.lastIndexOf('/'))
@@ -506,8 +507,8 @@ function getTransactions(callback) {
                 memo = memo.replace(/{postURL}/g, postURL)
                 // memo = memo.replace(/{amount}/g, reversal_transfer.amount);
                 utils.log(memo)
-                if (pubkey.length > 0) memo = steem.memo.encode(config.memo_key, pubkey, ('#' + memo))
-                client.broadcast.transfer({ amount: op[1].amount, from: config.account, to: op[1].from, memo: memo}, dsteem.PrivateKey.fromString(config.active_key))
+                if (pubkey.length > 0) memo = steem.memo.encode(wallet.account.memo, pubkey, ('#' + memo))
+                client.broadcast.transfer({ amount: op[1].amount, from: wallet.account.name, to: op[1].from, memo: memo}, dsteem.PrivateKey.fromString(wallet.account.active))
                 transactions.push(trans[1].trx_id)
                 continue
               }
@@ -519,8 +520,8 @@ function getTransactions(callback) {
               let memo = config.transfer_memos['reversal_not_found']
               memo = memo.replace(/{postURL}/g, postURL);
               utils.log(memo)
-              if (encrypted) memo = steem.memo.encode(config.memo_key, pubkey, ('#' + memo))
-              client.broadcast.transfer({ amount: utils.format(amount, 3) + ' ' + currency, from: config.account, to: reversal_requester, memo: memo}, dsteem.PrivateKey.fromString(config.active_key))
+              if (encrypted) memo = steem.memo.encode(wallet.account.memo, pubkey, ('#' + memo))
+              client.broadcast.transfer({ amount: utils.format(amount, 3) + ' ' + currency, from: wallet.account.name, to: reversal_requester, memo: memo}, dsteem.PrivateKey.fromString(wallet.account.active))
               transactions.push(trans[1].trx_id)
               continue
             }
@@ -930,7 +931,7 @@ function handleFlag(sender, amount, currency) {
 }
 
 function checkWitnessVote(sender, voter, currency) {
-  if(!config.owner_account || config.owner_account == '')
+  if(!wallet.owner_account.name || wallet.owner_account.name == '')
     return;
 
   client.database.getAccounts([voter]).then(function (result) {
@@ -940,7 +941,7 @@ function checkWitnessVote(sender, voter, currency) {
         return;
       }
 
-      if(result[0].witness_votes.indexOf(config.owner_account) < 0)
+      if(result[0].witness_votes.indexOf(wallet.owner_account.name) < 0)
         refund(sender, 0.001, currency, 'witness_vote', 0);
 		  else if(config.transfer_memos['bid_confirmation'] && config.transfer_memos['bid_confirmation'] != '') {
 				// Send bid confirmation transfer memo if one is specified
@@ -1002,7 +1003,7 @@ function refund(sender, amount, currency, reason, retries, data, pubkey) {
     retries = 0;
 
   // Make sure refunds are enabled and the sender isn't on the no-refund list (for exchanges and things like that).
-  if (reason != 'forward_payment' && (!config.refunds_enabled || sender == config.account || (config.no_refund && config.no_refund.indexOf(sender) >= 0))) {
+  if (reason != 'forward_payment' && (!config.refunds_enabled || sender == wallet.account.name || (config.no_refund && config.no_refund.indexOf(sender) >= 0))) {
     utils.log("Invalid bid - " + reason + ' NO REFUND');
 
     // If this is a payment from an account on the no_refund list, forward the payment to the post_rewards_withdrawal_account
@@ -1023,8 +1024,8 @@ function refund(sender, amount, currency, reason, retries, data, pubkey) {
   memo = memo.replace(/{min_bid}/g, config.min_bid);
   memo = memo.replace(/{max_bid}/g, config.max_bid);
   memo = memo.replace(/{max_bid_whitelist}/g, config.max_bid_whitelist);
-  memo = memo.replace(/{account}/g, config.account);
-  memo = memo.replace(/{owner}/g, config.owner_account);
+  memo = memo.replace(/{account}/g, wallet.account.name);
+  memo = memo.replace(/{owner}/g, wallet.owner_account.name);
   memo = memo.replace(/{min_age}/g, config.min_post_age);
 	memo = memo.replace(/{sender}/g, sender);
   memo = memo.replace(/{tag}/g, data);
@@ -1036,9 +1037,9 @@ function refund(sender, amount, currency, reason, retries, data, pubkey) {
   var hours = (config.max_post_age % 24);
   memo = memo.replace(/{max_age}/g, days + ' Day(s)' + ((hours > 0) ? ' ' + hours + ' Hour(s)' : ''));
   // if the bid was sent encrypted, we encrypt it back
-  if (pubkey && pubkey.length > 1) memo = steem.memo.encode(config.memo_key, pubkey, ('#' + memo))
+  if (pubkey && pubkey.length > 1) memo = steem.memo.encode(wallet.account.memo, pubkey, ('#' + memo))
   // Issue the refund.
-  client.broadcast.transfer({ amount: utils.format(amount, 3) + ' ' + currency, from: config.account, to: sender, memo: memo }, dsteem.PrivateKey.fromString(config.active_key)).then(function(response) {
+  client.broadcast.transfer({ amount: utils.format(amount, 3) + ' ' + currency, from: wallet.account.name, to: sender, memo: memo }, dsteem.PrivateKey.fromString(wallet.account.active)).then(function(response) {
     utils.log('Refund of ' + amount + ' ' + currency + ' sent to @' + sender + ' for reason: ' + reason);
   }, function(err) {
     logError('Error sending refund to @' + sender + ' for: ' + amount + ' ' + currency + ', Error: ' + err);
@@ -1057,8 +1058,8 @@ function claimRewards() {
 
   // Make api call only if you have actual reward
   if (parseFloat(account.reward_steem_balance) > 0 || parseFloat(account.reward_sbd_balance) > 0 || parseFloat(account.reward_vesting_balance) > 0) {
-    var op = ['claim_reward_balance', { account: config.account, reward_sbd: account.reward_sbd_balance, reward_steem: account.reward_steem_balance, reward_vests: account.reward_vesting_balance }];
-    client.broadcast.sendOperations([op], dsteem.PrivateKey.fromString(config.posting_key)).then(function(result) {
+    var op = ['claim_reward_balance', { account: wallet.account.name, reward_sbd: account.reward_sbd_balance, reward_steem: account.reward_steem_balance, reward_vests: account.reward_vesting_balance }];
+    client.broadcast.sendOperations([op], dsteem.PrivateKey.fromString(wallet.account.posting)).then(function(result) {
       if (result) {
         if(config.detailed_logging) {
           var rewards_message = "$$$ ==> Rewards Claim";
@@ -1073,7 +1074,7 @@ function claimRewards() {
         if(parseFloat(account.reward_sbd_balance) > 0 && config.post_rewards_withdrawal_account && config.post_rewards_withdrawal_account != '') {
 
           // Send liquid post rewards to the specified account
-          client.broadcast.transfer({ amount: account.reward_sbd_balance, from: config.account, to: config.post_rewards_withdrawal_account, memo: 'Liquid Post Rewards Withdrawal' }, dsteem.PrivateKey.fromString(config.active_key)).then(function(response) {
+          client.broadcast.transfer({ amount: account.reward_sbd_balance, from: wallet.account.name, to: config.post_rewards_withdrawal_account, memo: 'Liquid Post Rewards Withdrawal' }, dsteem.PrivateKey.fromString(wallet.account.active)).then(function(response) {
             utils.log('$$$ Auto withdrawal - liquid post rewards: ' + account.reward_sbd_balance + ' sent to @' + config.post_rewards_withdrawal_account);
           }, function(err) { utils.log('Error transfering liquid SBD post rewards: ' + err); });
         }
@@ -1082,7 +1083,7 @@ function claimRewards() {
         if(parseFloat(account.reward_steem_balance) > 0 && config.post_rewards_withdrawal_account && config.post_rewards_withdrawal_account != '') {
 
           // Send liquid post rewards to the specified account
-          client.broadcast.transfer({ amount: account.reward_steem_balance, from: config.account, to: config.post_rewards_withdrawal_account, memo: 'Liquid Post Rewards Withdrawal' }, dsteem.PrivateKey.fromString(config.active_key)).then(function(response) {
+          client.broadcast.transfer({ amount: account.reward_steem_balance, from: wallet.account.name, to: config.post_rewards_withdrawal_account, memo: 'Liquid Post Rewards Withdrawal' }, dsteem.PrivateKey.fromString(wallet.account.active)).then(function(response) {
             utils.log('$$$ Auto withdrawal - liquid post rewards: ' + account.reward_steem_balance + ' sent to @' + config.post_rewards_withdrawal_account);
           }, function(err) { utils.log('Error transfering liquid STEEM post rewards: ' + err); });
         }
@@ -1125,10 +1126,10 @@ function processWithdrawals() {
       if(withdrawal_account.name == '$delegators') {
         // Check if/where we should send payout for SP in the bot account directly
         if(withdrawal_account.overrides) {
-          var bot_override = withdrawal_account.overrides.find(o => o.name == config.account);
+          var bot_override = withdrawal_account.overrides.find(o => o.name == wallet.account.name);
 
           if(bot_override && bot_override.beneficiary) {
-            var bot_delegator = delegators.find(d => d.delegator == config.account);
+            var bot_delegator = delegators.find(d => d.delegator == wallet.account.name);
 
             // Calculate the amount of SP in the bot account and add/update it in the list of delegators
             var bot_vesting_shares = (parseFloat(account.vesting_shares) - parseFloat(account.delegated_vesting_shares)).toFixed(6) + ' VESTS';
@@ -1136,7 +1137,7 @@ function processWithdrawals() {
             if(bot_delegator)
               bot_delegator.vesting_shares = bot_vesting_shares;
             else
-              delegators.push({ delegator: config.account, vesting_shares: bot_vesting_shares });
+              delegators.push({ delegator: wallet.account.name, vesting_shares: bot_vesting_shares });
           }
         }
 
@@ -1220,7 +1221,7 @@ function processWithdrawals() {
     }
 
     // Check if the memo should be encrypted
-    var encrypt = (config.auto_withdrawal.memo.startsWith('#') && config.memo_key && config.memo_key != '');
+    var encrypt = (config.auto_withdrawal.memo.startsWith('#') && wallet.account.memo && wallet.account.memo != '');
 
     if(encrypt) {
       // Get list of unique withdrawal account names
@@ -1286,11 +1287,11 @@ function sendWithdrawal(withdrawal, retries, callback) {
   var memo = config.auto_withdrawal.memo.replace(/\{balance\}/g, formatted_amount);
 
   // Encrypt memo
-  if (memo.startsWith('#') && config.memo_key && config.memo_key != '')
-    memo = steem.memo.encode(config.memo_key, withdrawal.memo_key, memo);
+  if (memo.startsWith('#') && wallet.account.memo && wallet.account.memo != '')
+    memo = steem.memo.encode(wallet.account.memo, withdrawal.memo_key, memo);
 
   // Send the withdrawal amount to the specified account
-  client.broadcast.transfer({ amount: formatted_amount, from: config.account, to: withdrawal.to, memo: memo }, dsteem.PrivateKey.fromString(config.active_key)).then(function(response) {
+  client.broadcast.transfer({ amount: formatted_amount, from: wallet.account.name, to: withdrawal.to, memo: memo }, dsteem.PrivateKey.fromString(wallet.account.active)).then(function(response) {
     utils.log('$$$ Auto withdrawal: ' + formatted_amount + ' sent to @' + withdrawal.to);
 
     if(callback)

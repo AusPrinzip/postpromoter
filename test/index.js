@@ -10,7 +10,7 @@ const ora  = require('ora')
 
 const test_min_vp = config.test_min_vp
 
-if (process.env.verbose) console.log(chalk.bgWhite('testing bidbot account: @' + config.account + ' | testing bidder account: @' + config.test_account))
+if (process.env.verbose) console.log(chalk.bgWhite('testing bidbot account: @' + wallet.account.name + ' | testing bidder account: @' + config.test_account))
 
 function wait (seconds) {
   const spinner = ora('waiting ' + seconds / 1000 + ' seconds\n').start()
@@ -27,7 +27,7 @@ function post () {
     try {
       const new_permlink = 'postpromoter-steemium-fork-test-' + Date.parse(new Date())
       const test_post = { author: config.test_account, permlink: new_permlink, parent_permlink: 'steemium', parent_author: '', body: 'testing the postpromoter steemium fork', json_metadata: JSON.stringify({ app: 'steemium postpromoter fork' }), title: 'postpromoter-steemium-fork-test-' + Date.parse(new Date()) }
-      client.broadcast.comment(test_post, dsteem.PrivateKey.fromString(config.test_active_key))
+      client.broadcast.comment(test_post, dsteem.PrivateKey.fromString(wallet.test_account.active))
       .then(() => resolve())
     } catch (e) {
       reject(e)
@@ -52,7 +52,7 @@ setTimeout(function () {
       // first test, we send just a below min-bid encrypted bid request expecting a full refund
       var memo1 = '#this is just a test ' + Date.parse(new Date())
       // second test, we send a reversal request for a non-existent post in order to check refund
-      var memo2 = '#reverse https://steemit.com/@' + config.account + '/this-is-a-test-post-' + Date.parse(new Date())
+      var memo2 = '#reverse https://steemit.com/@' + wallet.account.name + '/this-is-a-test-post-' + Date.parse(new Date())
       // third, we will send a bid for a vote request on a self created post
       var memo3 = '#https://steemit.com/'
       // fourth, we will request reversal of the vote we just bidded for. One will be below price, the second above price.
@@ -77,7 +77,7 @@ setTimeout(function () {
 
       before(async function () {
         // check there is enough VP for the tests
-        const account = await client.database.call('get_accounts', [[config.account]])
+        const account = await client.database.call('get_accounts', [[wallet.account.name]])
         vp = account[0].voting_power
         if (vp < test_min_vp) throw new Error('not enough VP')
         // try posting a test-post
@@ -91,7 +91,7 @@ setTimeout(function () {
           comment_history = comment_history.filter((x) => x[1].op[0] == 'comment' && x[1].op[1].author == config.test_account).map((x) => x[1].op[1])
           last_post = comment_history[comment_history.length - 1]
           const content = await client.database.call('get_content', [last_post.author, last_post.permlink])
-          const vote = content.active_votes.find((x) => x.voter == config.account)
+          const vote = content.active_votes.find((x) => x.voter == wallet.account.name)
 
           if (last_post && last_post.permlink.indexOf('postpromoter-steemium-fork-test-') > -1 && (!vote || vote.weight == 0)) {
             if (process.env.verbose) console.log(chalk.italic.yellow('there is already an existing testing post => ' + last_post.permlink))
@@ -115,11 +115,11 @@ setTimeout(function () {
         memo3_encrypted = steem.memo.encode(config.memo_key, testAcc_pubkey, memo3)
         memo4_encrypted = steem.memo.encode(config.memo_key, testAcc_pubkey, memo4)
 
-        op1 = { amount: amount1, from: config.test_account, to: config.account, memo: memo1_encrypted }
-        op2 = { amount: amount2, from: config.test_account, to: config.account, memo: memo2_encrypted }
-        op3 = { amount: amount3, from: config.test_account, to: config.account, memo: memo3_encrypted }
-        op4a = { amount: amount4a, from: config.test_account, to: config.account, memo: memo4_encrypted }
-        op4b = { amount: amount4b, from: config.test_account, to: config.account, memo: memo4_encrypted }
+        op1 = { amount: amount1, from: config.test_account, to: wallet.account.name, memo: memo1_encrypted }
+        op2 = { amount: amount2, from: config.test_account, to: wallet.account.name, memo: memo2_encrypted }
+        op3 = { amount: amount3, from: config.test_account, to: wallet.account.name, memo: memo3_encrypted }
+        op4a = { amount: amount4a, from: config.test_account, to: wallet.account.name, memo: memo4_encrypted }
+        op4b = { amount: amount4b, from: config.test_account, to: wallet.account.name, memo: memo4_encrypted }
 
         expected_memo1_response = expected_memo1_response.replace(/{amount}/g, amount1).replace(/{min_bid}/g, config.min_bid)
         expected_memo2_response = expected_memo2_response.replace(/{postURL}/g, memo2.split(' ')[1])
@@ -139,17 +139,17 @@ setTimeout(function () {
         }
       })
       it('should encrypt and decript a memo', () => {
-        assert.equal(memo1, steem.memo.decode(config.test_memo_key, memo1_encrypted))
+        assert.equal(memo1, steem.memo.decode(wallet.test_account.memo, memo1_encrypted))
       })
       it('should send a encrypted below min_bid', function () {
         // PP WORKS ONLY WITH OPS WITH TRX_ID, VIRTUAL OPS HAVE NO TRX_ID AND THEREFORE ARE IGNORED BY PP
         // note: Mocha supports Promises out-of-the-box, you just have to return the Promise. If it resolves then the test passes otherwise it fails.
-        return client.broadcast.transfer(op1, dsteem.PrivateKey.fromString(config.test_active_key))
+        return client.broadcast.transfer(op1, dsteem.PrivateKey.fromString(wallet.test_account.active))
       })
       it('should send a encrypted reversal request for a non-existent post', async function () {
         this.retries(2)
         await wait(3000)
-        return client.broadcast.transfer(op2, dsteem.PrivateKey.fromString(config.test_active_key))
+        return client.broadcast.transfer(op2, dsteem.PrivateKey.fromString(wallet.test_account.active))
       })
       it('should request via steem rpc node the trx history of test account', async function () {
         bidhistory = await client.database.call('get_account_history', [config.test_account, -1, 50])
@@ -164,7 +164,7 @@ setTimeout(function () {
         // console.log(bidhistory)
         bidhistory.forEach((bid) => {
           if (bid.memo && bid.memo.startsWith('#')) {
-            bid.memo = steem.memo.decode(config.test_memo_key, bid.memo)
+            bid.memo = steem.memo.decode(wallet.test_account.memo, bid.memo)
             decrypt_num++
           }
         })
@@ -178,7 +178,7 @@ setTimeout(function () {
         bidhistory = bidhistory.map((x) => x[1].op[1])
         bidhistory.forEach((op) => {
           if (op.memo && op.memo.startsWith('#')) {
-            op.memo = steem.memo.decode(config.test_memo_key, op.memo)
+            op.memo = steem.memo.decode(wallet.test_account.memo, op.memo)
           }
         })
         if (process.env.verbose) {
@@ -195,7 +195,7 @@ setTimeout(function () {
         bidhistory = bidhistory.map((x) => x[1].op[1])
         bidhistory.forEach((op) => {
           if (op.memo && op.memo.startsWith('#')) {
-            op.memo = steem.memo.decode(config.test_memo_key, op.memo)
+            op.memo = steem.memo.decode(wallet.test_account.memo, op.memo)
           }
         })
         if (process.env.verbose) {
@@ -212,14 +212,14 @@ setTimeout(function () {
         bidhistory = bidhistory.map((x) => x[1].op[1])
         bidhistory.forEach((op) => {
           if (op.memo && op.memo.startsWith('#')) {
-            op.memo = steem.memo.decode(config.test_memo_key, op.memo)
+            op.memo = steem.memo.decode(wallet.test_account.memo, op.memo)
           }
         })
         if (process.env.verbose) {
 				    console.log(bidhistory.map((op) => op.memo))
 				    console.log(chalk.underline.red('should match: ' + expected_memo1_response))
         }
-        bidhistory = bidhistory.filter((op) => op.memo == expected_memo1_response && op.from == config.account)
+        bidhistory = bidhistory.filter((op) => op.memo == expected_memo1_response && op.from == wallet.account.name)
         expect(bidhistory.length).to.be.least(1)
       })
       it('should find the below-price reversal request refund', async function () {
@@ -229,37 +229,37 @@ setTimeout(function () {
         bidhistory = bidhistory.map((x) => x[1].op[1])
         bidhistory.forEach((op) => {
           if (op.memo && op.memo.startsWith('#')) {
-            op.memo = steem.memo.decode(config.test_memo_key, op.memo)
+            op.memo = steem.memo.decode(wallet.test_account.memo, op.memo)
           }
         })
         if (process.env.verbose) {
 				    console.log(bidhistory.map((op) => op.memo))
 				    console.log(chalk.underline.red('should match: ' + expected_memo2_response))
         }
-        bidhistory = bidhistory.filter((op) => op.memo == expected_memo2_response && op.from == config.account)
+        bidhistory = bidhistory.filter((op) => op.memo == expected_memo2_response && op.from == wallet.account.name)
         expect(bidhistory).to.have.length(1)
       })
       it('should bid on the test post for the min-bid amount', function () {
-        return client.broadcast.transfer(op3, dsteem.PrivateKey.fromString(config.test_active_key))
+        return client.broadcast.transfer(op3, dsteem.PrivateKey.fromString(wallet.test_account.active))
       })
       it('should cast the vote', async function () {
         this.retries(10)
         await wait(15000)
         const content = await client.database.call('get_content', [test_post.author, test_post.permlink])
-        const vote = content.active_votes.find((x) => x.voter == config.account)
+        const vote = content.active_votes.find((x) => x.voter == wallet.account.name)
         expect(vote).to.not.have.property('weight', 0)
         console.log(test_post.permlink)
         console.log(vote)
       })
       // it('should manually vote on the test post', function () {
       // 	if (already_voted) this.skip()
-      // 	return client.broadcast.vote({ voter: config.account, author: test_post.author, permlink: test_post.permlink, weight: 1000 }, dsteem.PrivateKey.fromString(config.posting_key))
+      // 	return client.broadcast.vote({ voter: wallet.account.name, author: test_post.author, permlink: test_post.permlink, weight: 1000 }, dsteem.PrivateKey.fromString(config.posting_key))
       // })
       it('should request a reversal for the last min-bid vote via encrypted memo with insufficient funds', function () {
-        return client.broadcast.transfer(op4a, dsteem.PrivateKey.fromString(config.test_active_key))
+        return client.broadcast.transfer(op4a, dsteem.PrivateKey.fromString(wallet.test_account.active))
       })
       it('should request a reversal for the last min-bid vote via encrypted memo with more funds than necessary', function () {
-        return client.broadcast.transfer(op4b, dsteem.PrivateKey.fromString(config.test_active_key))
+        return client.broadcast.transfer(op4b, dsteem.PrivateKey.fromString(wallet.test_account.active))
       })
       it('should find the insufficient funds reversal refund', async function () {
         this.retries(5)
@@ -268,14 +268,14 @@ setTimeout(function () {
         bidhistory = bidhistory.map((x) => x[1].op[1])
         bidhistory.forEach((op) => {
           if (op.memo && op.memo.startsWith('#')) {
-            op.memo = steem.memo.decode(config.test_memo_key, op.memo)
+            op.memo = steem.memo.decode(wallet.test_account.memo, op.memo)
           }
         })
         if (process.env.verbose) {
 				    console.log(bidhistory.map((op) => op.memo))
 				    console.log(chalk.underline.red('should match: ' + expected_memo4a_response))
         }
-        bidhistory = bidhistory.filter((op) => op.memo == expected_memo4a_response && op.from == config.account)
+        bidhistory = bidhistory.filter((op) => op.memo == expected_memo4a_response && op.from == wallet.account.name)
         expect(bidhistory.length).to.be.least(1)
       })
       it('should reverse the vote', async function () {
@@ -285,7 +285,7 @@ setTimeout(function () {
         comment_history = comment_history.filter((x) => x[1].op[0] == 'comment' && x[1].op[1].author == config.test_account).map((x) => x[1].op[1])
         last_post = comment_history[comment_history.length - 1]
         const content = await client.database.call('get_content', [last_post.author, last_post.permlink])
-        const vote = content.active_votes.find((x) => x.voter == config.account)
+        const vote = content.active_votes.find((x) => x.voter == wallet.account.name)
         expect(vote).to.be.an('object')
         assert.isAbove(vote.weight, 0)
       })
@@ -296,14 +296,14 @@ setTimeout(function () {
         bidhistory = bidhistory.map((x) => x[1].op[1])
         bidhistory.forEach((op) => {
           if (op.memo && op.memo.startsWith('#')) {
-            op.memo = steem.memo.decode(config.test_memo_key, op.memo)
+            op.memo = steem.memo.decode(wallet.test_account.memo, op.memo)
           }
         })
         if (process.env.verbose) {
 				    console.log(bidhistory.map((op) => op.memo))
 				    console.log(chalk.underline.red('should match: ' + expected_memo4b_response))
         }
-        bidhistory = bidhistory.filter((op) => op.memo == expected_memo4b_response && op.from == config.account)
+        bidhistory = bidhistory.filter((op) => op.memo == expected_memo4b_response && op.from == wallet.account.name)
         expect(bidhistory.length).to.be.least(1)
       })
     })

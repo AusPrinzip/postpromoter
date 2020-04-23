@@ -5,7 +5,7 @@ var fs        = require('fs');
 var config    = JSON.parse(fs.readFileSync("config.json"));
 var client    = new dsteem.Client('https://anyx.io')
 const version = 'postpromoter Steemium Fork - 1.0.0';
-
+const wallet  = JSON.parse(fs.readFileSync("wallet.json"));
 
 function checkAmount(bid_transfer, reversal_transfer, reversal_price, steem_price, sbd_price, pubkey) {
 
@@ -28,14 +28,14 @@ function reverseVote(vote_to_reverse, leftovers_usd, pubkey, reversal_transfer, 
     let permlink = postURL.substr(postURL.lastIndexOf('/') + 1)
     var author   = postURL.substring(postURL.lastIndexOf('@') + 1, postURL.lastIndexOf('/'))
     const vote   = {
-      'voter': config.account,
+      'voter': wallet.account.name,
       'author': author,
       'permlink': permlink,
       'weight': 0
     }
     // console.log(vote)
     try { 
-      await client.broadcast.vote(vote, dsteem.PrivateKey.fromString(config.posting_key))
+      await client.broadcast.vote(vote, dsteem.PrivateKey.fromString(wallet.account.posting))
     } catch(e) {
       console.log(e)
       utils.log('Error reversing vote for: @' + vote_to_reverse.from + permlink);
@@ -44,8 +44,8 @@ function reverseVote(vote_to_reverse, leftovers_usd, pubkey, reversal_transfer, 
         let memo    = config.transfer_memos['already_reversed']
         memo        = memo.replace(/{postURL}/g, postURL)
         utils.log(memo)
-        if (pubkey.length > 0) memo = steem.memo.encode(config.memo_key, pubkey, ('#' + memo))
-        return client.broadcast.transfer({ amount: reversal_transfer.amount, from: config.account, to: reversal_transfer.from , memo: memo}, dsteem.PrivateKey.fromString(config.active_key))
+        if (pubkey.length > 0) memo = steem.memo.encode(wallet.account.memo, pubkey, ('#' + memo))
+        return client.broadcast.transfer({ amount: reversal_transfer.amount, from: wallet.account.name, to: reversal_transfer.from , memo: memo}, dsteem.PrivateKey.fromString(wallet.account.active))
       }
       // Try again on error
       if(retries < 2) return setTimeout(() => { reverseVote(vote_to_reverse, retries + 1); }, 10000);
@@ -61,8 +61,8 @@ function reverseVote(vote_to_reverse, leftovers_usd, pubkey, reversal_transfer, 
     let memo = config.transfer_memos['reversal_leftovers']
     memo = memo.replace(/{postURL}/g, postURL);
     utils.log(memo)
-    if (pubkey.length > 0) memo = steem.memo.encode(config.memo_key, pubkey, ('#' + memo))
-    client.broadcast.transfer({ amount: leftovers, from: config.account, to: reversal_transfer.from, memo: memo}, dsteem.PrivateKey.fromString(config.active_key))
+    if (pubkey.length > 0) memo = steem.memo.encode(wallet.account.memo, pubkey, ('#' + memo))
+    client.broadcast.transfer({ amount: leftovers, from: wallet.account.name, to: reversal_transfer.from, memo: memo}, dsteem.PrivateKey.fromString(wallet.account.active))
     .catch((e) => {
       console.log(e)
     })
@@ -93,7 +93,7 @@ function sendReversalComment(vote_to_reverse) {
 
     // Broadcast the comment
     var comment = { 
-      author: config.account, 
+      author: wallet.account.name, 
       permlink: permlink, 
       parent_author: author, 
       parent_permlink: parent_permlink, 
@@ -102,7 +102,7 @@ function sendReversalComment(vote_to_reverse) {
       json_metadata: '{"app":"postpromoter/' + version + '"}' 
     };
     // Broadcast the comment
-    client.broadcast.comment(comment, dsteem.PrivateKey.fromString(config.posting_key))
+    client.broadcast.comment(comment, dsteem.PrivateKey.fromString(wallet.account.posting))
     .then((res) => utils.log('reversal comment to reversed vote author has been succesfully broadcasted'))
     .catch((e) => {
       utils.log('reversal comment to reversed vote author has NOT been succesfully broadcasted')
