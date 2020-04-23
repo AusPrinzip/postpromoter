@@ -117,15 +117,6 @@ Then set the following options in config.json:
   "backup_mode": false,
   "disabled_mode": false,
   "detailed_logging": false,
-  "owner_account": "bot_owner_account_name",
-  "account": "your_bot_account_name",
-  "memo_key": "your_private_memo_key",
-  "posting_key": "your_private_posting_key",
-  "active_key": "your_private_active_key",
-  "test_account": "your_testing_account",
-  "test_memo_key": "memo_test_key",
-  "test_posting_key":"`posting_test_key",
-  "test_active_key":"active_test_key",
   "auto_claim_rewards" : true,
   "post_rewards_withdrawal_account": "withdraw_liquid_post_rewards_to_account",
   "min_bid": 0.1,
@@ -217,6 +208,45 @@ Then set the following options in config.json:
 }
 
 ```
+
+### Fill up wallet.json with your keys for each role
+```
+
+
+  {
+    "account": {
+      "name": "",
+      "active": "",
+      "posting":"",
+      "memo": "",
+    },
+    "owner_account": {
+      "name": "",
+      "active": "",
+      "posting":"",
+      "memo": "",
+    },
+    "test_account": {
+      "name": "",
+      "active": "",
+      "posting":"",
+      "memo": "",
+    },
+    "acc_creating_account": {
+      "name": "",
+      "active": "",
+      "posting":"",
+      "memo": "",
+    },
+    "acc_claiming_account": {
+      "name": "",
+      "active": "",
+      "posting":"",
+      "memo": "",
+    }
+  }
+```
+
 
 ### Blacklist
 You can add a list users whose bids will not be accepted and who will not receive any refund by adding their Steem account to the "blacklist" file. Set the "blacklist_location" property to point to the location of your blacklist file, or you can use a URL to point to a shared blacklist on the internet. The file should contain only one steem account name on each line and nothing else as in the following example:
