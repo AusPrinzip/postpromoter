@@ -1,7 +1,7 @@
 var fs        = require("fs");
 var request   = require("request");
-var steem     = require('steem');
-var dsteem    = require('dsteem');
+var steem     = require('@hiveio/hive-js');
+var dsteem    = require('@hiveio/dhive');
 var utils     = require('./utils');
 var reverse   = require('./reversal')
 var claim_acc = require('./claim_account')
@@ -42,7 +42,7 @@ function startup() {
   loadConfig();
   test_min_vp = config.test_min_vp
   // Connect to the specified RPC node
-  rpc_node = config.rpc_nodes ? config.rpc_nodes[0] : (config.rpc_node ? config.rpc_node : 'https://api.steemit.com');
+  rpc_node = config.rpc_nodes ? config.rpc_nodes[0] : (config.rpc_node ? config.rpc_node : 'https://anyx.io');
   client = new dsteem.Client(rpc_node);
 
   utils.log("* START - Version: " + version + " *");

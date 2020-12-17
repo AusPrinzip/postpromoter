@@ -1,5 +1,5 @@
-var steem     = require('steem')
-var dsteem    = require('dsteem')
+var steem     = require('@hiveio/hive-js')
+var dsteem    = require('@hiveio/dhive')
 var utils     = require('./utils.js');
 var fs        = require('fs');
 var config    = JSON.parse(fs.readFileSync("config.json"));

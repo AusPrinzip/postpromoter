@@ -1,6 +1,6 @@
-const steem = require('steem');
+const steem = require('@hiveio/hive-js');
 var utils = require('./utils');
-var dsteem = require('dsteem');
+var dsteem = require('@hiveio/dhive');
 
 var delegation_transactions = [];
 

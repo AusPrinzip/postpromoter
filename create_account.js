@@ -1,7 +1,7 @@
-const dsteem     = require('dsteem')
+const dsteem     = require('@hiveio/dhive')
 const fs         = require('fs')
 const config     = JSON.parse(fs.readFileSync('./config.json'))
-const client     = new dsteem.Client('https://api.steemit.com')
+const client     = new dsteem.Client('https://anyx.io')
 const active_key = dsteem.PrivateKey.fromString(wallet.acc_creating_account.active)
 const steem      = require('steem');
 var utils        = require('./utils.js')

@@ -1,9 +1,9 @@
 var fs                    = require("fs");
 var config                = JSON.parse(fs.readFileSync("config.json"));
 const SEC                 = 1000, MIN = SEC * 60, HOUR = MIN * 60
-var dsteem				  = require('dsteem')
+var dsteem				  = require('@hiveio/dhive')
 var utils                 = require('./utils.js')
-var client				  = new dsteem.Client('https://api.steemit.com')
+var client				  = new dsteem.Client('https://anyx.io')
 
 let current_hour          = new Date().getHours()
 let current_min           = new Date().getMinutes()

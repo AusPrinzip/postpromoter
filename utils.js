@@ -1,5 +1,5 @@
 var fs = require("fs");
-var dsteem = require('dsteem');
+var dsteem = require('@hiveio/dhive');
 
 var STEEMIT_100_PERCENT = 10000;
 var STEEMIT_VOTE_REGENERATION_SECONDS = (5 * 60 * 60 * 24);
