@@ -1,0 +1,34 @@
+
+
+  {
+  	"account": {
+  		"name": "",
+  		"active": "",
+  		"posting":"",
+  		"memo": "",
+  	},
+  	"owner_account": {
+  		"name": "",
+  		"active": "",
+  		"posting":"",
+  		"memo": "",
+  	},
+  	"test_account": {
+  		"name": "",
+  		"active": "",
+  		"posting":"",
+  		"memo": "",
+  	},
+  	"acc_creating_account": {
+  		"name": "",
+  		"active": "",
+  		"posting":"",
+  		"memo": "",
+  	},
+   	"acc_claiming_account": {
+  		"name": "",
+  		"active": "",
+  		"posting":"",
+  		"memo": "",
+  	}
+  }
