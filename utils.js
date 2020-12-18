@@ -31,7 +31,7 @@ var HOURS = 60 * 60;
 
     client.database.getDynamicGlobalProperties().then(function (t) {
       votePowerReserveRate = t.vote_power_reserve_rate;
-      totalVestingFund = parseFloat(t.total_vesting_fund_steem.replace(" STEEM", ""));
+      totalVestingFund = parseFloat(t.total_vesting_fund_hive.replace(" HIVE", ""));
       totalVestingShares = parseFloat(t.total_vesting_shares.replace(" VESTS", ""));
       steem_per_mvests = ((totalVestingFund / totalVestingShares) * 1000000);
       sbd_print_percentage = t.sbd_print_rate / 10000

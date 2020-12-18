@@ -136,6 +136,7 @@ function startProcess() {
 
   // Load the bot account info
   client.database.getAccounts([wallet.account.name]).then(function (result) {
+
     account = result[0];
 
     if (account && !isVoting) {
@@ -431,7 +432,7 @@ function getTransactions(callback) {
         // We only care about transfers to the bot
         if (op[0] == 'transfer' && op[1].to == wallet.account.name) {
           var amount     = parseFloat(op[1].amount);
-          var amount_usd = currency == 'STEEM' ? amount * steem_price : amount * sbd_price;
+          var amount_usd = currency == 'HIVE' ? amount * steem_price : amount * sbd_price;
           var currency   = utils.getCurrency(op[1].amount);
           var memo       = op[1].memo;
           var encrypted  = false
@@ -467,7 +468,10 @@ function getTransactions(callback) {
           transactions.shift();
 
           utils.log(memo)
+          // for acc creation "_" and " " in memo are equivalent
+          memo = memo.replace('_', ' ')
           var wordsArray = memo.split(' ')
+
           if (config.reversal_enabled && wordsArray && wordsArray[0].indexOf('reverse') > -1) { // suggestion: make it less common like 'ppflag' as keyword
             // check if memo formatting is right
             if (wordsArray.length != 2) {
@@ -527,10 +531,8 @@ function getTransactions(callback) {
             }
           }
           // account creation
-          if (config.create_account_enabled && wordsArray && wordsArray[0].indexOf('createaccount') > -1) {
-            // for acc creation "_" and " " in memo are equivalent
-            memo = memo.replace('_', ' ')
-            wordsArray = wordsArray.split(' ')
+          if (config.create_account_enabled && wordsArray.length > 1 && wordsArray[0].indexOf('createaccount') > -1) {
+            utils.log('Create Account Memo detected!')
             // check if memo formatting is right
             if (wordsArray.length != 3 && wordsArray.length != 6) {
               console.log(wordsArray)
@@ -538,11 +540,10 @@ function getTransactions(callback) {
               transactions.push(trans[1].trx_id)
               continue     
             }
-            utils.log('Create Account Memo detected!')
             let newAccount    = wordsArray[1]
-            let priceCurrency = config.create_account_price.indexOf('STEEM') > 0 ? 'STEEM' : 'SBD'
+            let priceCurrency = config.create_account_price.indexOf('HIVE') > 0 ? 'HIVE' : 'HBD'
             let leftovers     = parseFloat(amount - parseFloat(config.create_account_price)).toFixed(3) + ' ' + priceCurrency
-            if (leftovers < 0) {
+            if (parseFloat(leftovers) < 0) {
               refund(op[1].from, amount, currency, 'create_acc_insufficient', 0, null, pubkey);
               transactions.push(trans[1].trx_id)
               continue             
@@ -566,7 +567,7 @@ function getTransactions(callback) {
               }
             }
             // in case there are no leftovers to send back, we set a stander microtransfer amount just to confirm via transfer memo
-            if (parseFloat(leftovers) == 0) leftovers = '0.001 STEEM'
+            if (parseFloat(leftovers) == 0) leftovers = '0.001 HIVE'
             refund(op[1].from, parseFloat(leftovers), currency, 'create_acc', 0, newAccount, pubkey);
             transactions.push(trans[1].trx_id)
             continue
@@ -1030,7 +1031,7 @@ function refund(sender, amount, currency, reason, retries, data, pubkey) {
 	memo = memo.replace(/{sender}/g, sender);
   memo = memo.replace(/{tag}/g, data);
   memo = memo.replace(/{name}/g, data);
-  memo = memo.replace(/{create_account_price_usd}/g, config.create_account_price_usd);
+  memo = memo.replace(/{create_account_price}/g, config.create_account_price);
 
 
   var days = Math.floor(config.max_post_age / 24);
@@ -1312,62 +1313,27 @@ function sendWithdrawal(withdrawal, retries, callback) {
 }
 
 function loadPrices() {
-  if(config.price_source == 'coinmarketcap') {
-    // Load the price feed data
-    request.get('https://api.coinmarketcap.com/v1/ticker/steem/', function (e, r, data) {
-      try {
-        steem_price = parseFloat(JSON.parse(data)[0].price_usd);
+  // Load the price feed data
+  request.get('https://api.coinmarketcap.com/v1/ticker/hive/', function (e, r, data) {
+    try {
+      steem_price = parseFloat(JSON.parse(data)[0].price_usd);
 
-        utils.log("Loaded STEEM price: " + steem_price);
-      } catch (err) {
-        utils.log('Error loading STEEM price: ' + err);
-      }
-    });
+      utils.log("Loaded STEEM price: " + steem_price);
+    } catch (err) {
+      utils.log('Error loading STEEM price: ' + err);
+    }
+  });
 
-    // Load the price feed data
-    request.get('https://api.coinmarketcap.com/v1/ticker/steem-dollars/', function (e, r, data) {
-      try {
-        sbd_price = parseFloat(JSON.parse(data)[0].price_usd);
+  // Load the price feed data
+  request.get('https://api.coinmarketcap.com/v1/ticker/hive-dollars/', function (e, r, data) {
+    try {
+      sbd_price = parseFloat(JSON.parse(data)[0].price_usd);
 
-        utils.log("Loaded SBD price: " + sbd_price);
-      } catch (err) {
-        utils.log('Error loading SBD price: ' + err);
-      }
-    });
-  } else if (config.price_source && config.price_source.startsWith('http')) {
-    request.get(config.price_source, function (e, r, data) {
-      try {
-        sbd_price = parseFloat(JSON.parse(data).sbd_price);
-        steem_price = parseFloat(JSON.parse(data).steem_price);
-
-        utils.log("Loaded STEEM price: " + steem_price);
-        utils.log("Loaded SBD price: " + sbd_price);
-      } catch (err) {
-        utils.log('Error loading STEEM/SBD prices: ' + err);
-      }
-    });
-  } else {
-    // Load STEEM price in BTC from bittrex and convert that to USD using BTC price in coinmarketcap
-    request.get('https://api.coinmarketcap.com/v1/ticker/bitcoin/', function (e, r, data) {
-      request.get('https://bittrex.com/api/v1.1/public/getticker?market=BTC-STEEM', function (e, r, btc_data) {
-        try {
-          steem_price = parseFloat(JSON.parse(data)[0].price_usd) * parseFloat(JSON.parse(btc_data).result.Last);
-          utils.log('Loaded STEEM Price from Bittrex: ' + steem_price);
-        } catch (err) {
-          utils.log('Error loading STEEM price from Bittrex: ' + err);
-        }
-      });
-
-      request.get('https://bittrex.com/api/v1.1/public/getticker?market=BTC-SBD', function (e, r, btc_data) {
-        try {
-          sbd_price = parseFloat(JSON.parse(data)[0].price_usd) * parseFloat(JSON.parse(btc_data).result.Last);
-          utils.log('Loaded SBD Price from Bittrex: ' + sbd_price);
-        } catch (err) {
-          utils.log('Error loading SBD price from Bittrex: ' + err);
-        }
-      });
-    });
-  }
+      utils.log("Loaded SBD price: " + sbd_price);
+    } catch (err) {
+      utils.log('Error loading SBD price: ' + err);
+    }
+  });
 }
 
 function getUsdValue(bid) { return bid.amount * ((bid.currency == 'SBD') ? sbd_price : steem_price); }

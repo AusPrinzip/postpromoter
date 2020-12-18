@@ -1,9 +1,10 @@
 const dsteem     = require('@hiveio/dhive')
+const steem      = require('@hiveio/hive-js');
 const fs         = require('fs')
 const config     = JSON.parse(fs.readFileSync('./config.json'))
 const client     = new dsteem.Client('https://anyx.io')
+var wallet       = JSON.parse(fs.readFileSync("wallet.json"));
 const active_key = dsteem.PrivateKey.fromString(wallet.acc_creating_account.active)
-const steem      = require('steem');
 var utils        = require('./utils.js')
 
 //TODO: pass client as argument or as module export 
@@ -43,7 +44,7 @@ async function createAccount(wordsArray) {
 	const create_op = [
 	    'create_claimed_account',
 	    {
-	        creator: config.account,
+	        creator: wallet.acc_creating_account.name,
 	        new_account_name: newAccount,
 	        owner: ownerAuth,
 	        active: activeAuth,

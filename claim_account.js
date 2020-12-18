@@ -4,6 +4,7 @@ const SEC                 = 1000, MIN = SEC * 60, HOUR = MIN * 60
 var dsteem				  = require('@hiveio/dhive')
 var utils                 = require('./utils.js')
 var client				  = new dsteem.Client('https://anyx.io')
+var wallet                = JSON.parse(fs.readFileSync("wallet.json"));
 
 let current_hour          = new Date().getHours()
 let current_min           = new Date().getMinutes()
