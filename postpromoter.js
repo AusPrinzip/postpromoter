@@ -560,10 +560,12 @@ function getTransactions(callback) {
               utils.log('succesfully created new account: @' + newAccount)
             } catch(e) {
               console.log(e)
-              if (e == 'account name already taken') {
+              if (e == 'account name already taken') { // fix this => it is not supossed to be an error
                 refund(op[1].from, amount, currency, 'taken', 0, newAccount, pubkey);
+                continue;
               } else {
                 refund(op[1].from, amount, currency, '504', 0, null, pubkey);
+                continue;
               }
             }
             // in case there are no leftovers to send back, we set a stander microtransfer amount just to confirm via transfer memo
